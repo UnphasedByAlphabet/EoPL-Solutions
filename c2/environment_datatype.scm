@@ -2,6 +2,19 @@
 (require eopl/eopl)
 (require eopl)
 
+(define-datatype s-list s-list?
+  (empty-s-list)
+  (non-empty-s-list
+    (first s-exp?)
+    (rest s-list?)
+  )
+)
+
+(define-datatype s-exp s-exp?
+  (symbol-s-exp (sym symbol?))
+  (s-list-s-exp (slst s-list?))
+)
+
 (define-datatype environment environment?
   (empty-env)
   (non-empty-env
@@ -15,14 +28,16 @@
       (empty-env () #f)  ; Base case: empty environment returns #f
       (non-empty-env (key value next)
         (or
-          (eqv? key var)  ; Check if the current key matches var
+          (eqv? (
+            cases s-exp key (symbol-s-exp (sym) sym) (else #f) # Extract value of s-exp from expression
+          ) var)  ; Check if the current key matches var
           (has-bindings? next var))))))  ; Recur on the rest of the environment
 
 (define test-env
-  (non-empty-env 'x 10
-    (non-empty-env 'y 20
-      (non-empty-env 'z 30
-        (empty-env)))))  ; Environment: {x -> 10, y -> 20, z -> 30}
+  (non-empty-env (symbol-s-exp 'x) (symbol-s-exp 'r)
+    (non-empty-env (symbol-s-exp 'y) (symbol-s-exp 'a)
+      (non-empty-env (symbol-s-exp 'z) (symbol-s-exp 'c)
+        (empty-env)))))  ; Environment: {x -> r, y -> a, z -> c}
 
 (display (has-bindings? test-env 'x))  ; Output: #t
 (newline)
