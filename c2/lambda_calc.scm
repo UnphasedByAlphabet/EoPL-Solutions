@@ -44,7 +44,7 @@
   (lambda (lcval)
     (cond
       [(var-exp? lcval) (cadr lcval)]
-      [(lambda-exp? lcval) (list 'lambda (list (cadr lcval)) (caddr lcval))]
+      [(lambda-exp? lcval) (list 'lambda (cadr lcval) (caddr lcval))]
       [(app-exp? lcval) (list (cadr lcval) (caddr lcval))]
       [else (report-invalid-expression lcval)])))  ;; Fixed missing argument
 
@@ -54,7 +54,8 @@
               "Invalid Lambda cond expression: ~a" expr))
 
 ;; === Helper Function for Testing ===
-(define (test name expected actual)
+(define test 
+(lambda (name expected actual)
   (display name)
   (display ": ")
   (if (equal? expected actual)
@@ -63,7 +64,7 @@
         (display "❌ Fail. Expected: ") 
         (display expected)
         (display ", but got: ")
-        (displayln actual))))
+        (displayln actual)))))
 
 ;; === Constructor Tests ===
 (test "var-exp" '(var_expr x) (var-exp 'x))
