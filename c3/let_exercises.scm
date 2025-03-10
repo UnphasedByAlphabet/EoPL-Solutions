@@ -18,6 +18,15 @@
     (expression
         ("-" "(" expression "," expression ")")
         diff-exp)
+    (expression 
+        ("+" "(" expression "," expression ")")
+        add-exp)
+    (expression 
+        ("*" "(" expression "," expression ")")
+        mul-exp)
+    (expression 
+        ("//" "(" expression "," expression ")")
+        quot-exp)
     (expression
         ("zero?" "(" expression ")")
         zero?-exp)
@@ -30,7 +39,13 @@
         let-exp)
     (expression ; Extension minus of exercise 3.6
         ("minus" "(" expression ")")
-        minus-expression))) 
+        minus-expression)))
+    (expression "emptylist" emptylist-exp)
+    (expression "cons" "(" expression "," expression ")" cons-list-exp)
+    (expression "null?" "(" expression ")" null?-exp)
+    (expression "car" expression car-exp)
+    (expression "cdr" expression cdr-exp)
+
 
 (sllgen:make-define-datatypes the-lexical-spec the-grammar)
 (define scan&parse
@@ -40,7 +55,9 @@
     (num-val
         (num number?))
     (bool-val
-        (bool boolean?)))
+        (bool boolean?))
+    (emptylist-val)
+    (cons-val (first expval? rest expval?)))
 
 ; expval->num : ExpVal → Int
 (define expval->num
@@ -55,6 +72,32 @@
     (cases expval val
         (bool-val (bool) bool)
         (else (report-expval-extractor-error 'bool val)))))
+
+(define expval->emptylist
+    (lambda val
+        (cases expval val
+            (exptylist-val (elst) elst)
+            (else (report-expval-extractor-error 'exptylist val)))))
+
+; https://github.com/svenpanne/EOPL3/blob/master/chapter3/exercise-3-09.rkt
+(define expval->emptylist?
+  (lambda (val)
+    (cases expval val
+      (emptylist-val () #t)
+      (cons-val (first rest) #f)
+      (else (report-expval-extractor-error 'cons-or-emptylist val)))))
+
+(define expval->car
+    (lambda val
+        (cases expval val
+            (cons-val (first rest) first)
+            (else (report-expval-extractor-error 'conslist val)))))
+
+(define expval->cdr
+    (lambda val
+        (cases expval val
+            (cons-val (first rest) rest)
+            (else (report-expval-extractor-error 'conslist val)))))
 
 (define report-expval-extractor-error
 (lambda (type val)
@@ -103,6 +146,27 @@
                     (num2 (expval->num val2)))
                     (num-val
                     (- num1 num2)))))
+        (add-exp (exp1 exp2)
+            (let ((val1 (value-of exp1 env))
+                (val2 (value-of exp2 env)))
+                (let ((num1 (expval->num val1))
+                    (num2 (expval->num val2)))
+                    (num-val
+                    (+ num1 num2)))))
+        (mul-exp (exp1 exp2)
+            (let ((val1 (value-of exp1 env))
+                (val2 (value-of exp2 env)))
+                (let ((num1 (expval->num val1))
+                    (num2 (expval->num val2)))
+                    (num-val
+                    (* num1 num2)))))
+        (quot-exp (exp1 exp2)
+            (let ((val1 (value-of exp1 env))
+                (val2 (value-of exp2 env)))
+                (let ((num1 (expval->num val1))
+                    (num2 (expval->num val2)))
+                    (num-val
+                    (quotient num1 num2)))))
         (zero?-exp (exp1)
             (let ((val1 (value-of exp1 env)))
                 (let ((num1 (expval->num val1)))
@@ -119,7 +183,20 @@
                 (value-of body (extend-env var val1 env))))
         (minus-expression (exp1)
             (let ((val1 (value-of exp1 env)))
-                (- (expval->num val1)))))))
+                (- (expval->num val1))))
+        (emptylist-exp () (emptylist-val))
+        (cons-exp (new list)
+            (cons-val new list))
+        (null?-exp (expr)
+            (let ((val value-of expr env))
+                (let ((bool1 expval->exptylist? val))
+                    (bool-val bool1))))
+        (car-exp (expr)
+            (let ((val value-of expr env))
+                (expval->car val))
+        (cdr-exp (expr)
+            (let ((val value-of expr env))
+                (expval->cdr val)))))))
 
 ;; init-env : -> Env
 ;; (init-env) builds an environment in which i is bound to the
