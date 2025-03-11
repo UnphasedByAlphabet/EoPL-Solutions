@@ -33,7 +33,9 @@
     (expression
         ("proc" "(" (separated-list identifier ",") ")" expression) proc-exp)
     (expression
-        ("(" expression "(" (arbno expression) ")" ")") call-exp)
+        ("traceproc" "(" (separated-list identifier ",") ")" expression) traceproc-exp)
+    (expression
+        ("(" expression (arbno expression) ")") call-exp)
     (expression
         ("if" expression "then" expression "else" expression)
         if-exp)
@@ -92,6 +94,8 @@
         (bool boolean?))
     (proc-val
         (proc proc?))
+    (traceproc-val
+        (proc proc?))        
     (emptylist-val)
     (cons-val (first expval?) (rest expval?)))
 
@@ -114,6 +118,13 @@
 (lambda (val)
     (cases expval val
         (proc-val (proc) proc)
+        (else (report-expval-extractor-error 'proc val)))))
+
+;expval->traceproc : ExpVal -> proc
+(define expval->traceproc
+(lambda (val)
+    (cases expval val
+        (traceproc-val (proc) proc)
         (else (report-expval-extractor-error 'proc val)))))
 
 
@@ -184,38 +195,50 @@
         (proc-exp (var body) 
             (proc-val
                 (procedure var body env)))
+        (traceproc-exp (var body) 
+            (traceproc-val
+                (procedure var body env)))
         (call-exp (rator rand)
-            (let ((proc (expval->proc (value-of rator env)))
-                (args (map (lambda (x) (value-of x env)) rand)))
-                (apply-procedure proc args)))
+            (let ((args (map (lambda (x) (value-of x env)) rand))
+                (val (value-of rator env)))
+                (cases expval val
+                    (proc-val (proc)
+                        (apply-procedure proc args))
+                    (traceproc-val (proc)
+                        (let ()
+                            (display (format "started proc\n"))
+                            (define res (apply-procedure proc args))
+                            (display (format "finished proc\n"))
+                            res))
+                    (else (report-expval-extractor-error 'proc val)))))
         (diff-exp (exp1 exp2)
             (let ((val1 (value-of exp1 env))
                 (val2 (value-of exp2 env)))
                 (let ((num1 (expval->num val1))
                     (num2 (expval->num val2)))
                     (num-val
-                    (- num1 num2)))))
+                        (- num1 num2)))))
         (add-exp (exp1 exp2)
             (let ((val1 (value-of exp1 env))
                 (val2 (value-of exp2 env)))
                 (let ((num1 (expval->num val1))
                     (num2 (expval->num val2)))
                     (num-val
-                    (+ num1 num2)))))
+                        (+ num1 num2)))))
         (mul-exp (exp1 exp2)
             (let ((val1 (value-of exp1 env))
                 (val2 (value-of exp2 env)))
                 (let ((num1 (expval->num val1))
                     (num2 (expval->num val2)))
                     (num-val
-                    (* num1 num2)))))
+                        (* num1 num2)))))
         (quot-exp (exp1 exp2)
             (let ((val1 (value-of exp1 env))
                 (val2 (value-of exp2 env)))
                 (let ((num1 (expval->num val1))
                     (num2 (expval->num val2)))
                     (num-val
-                    (quotient num1 num2)))))
+                        (quotient num1 num2)))))
         (zero?-exp (exp1)
             (let ((val1 (value-of exp1 env)))
                 (let ((num1 (expval->num val1)))
@@ -265,7 +288,20 @@
 
 (value-of-program (
     scan&parse 
-        "letproc f (x) -(x, 11) in (f ((f (77))))"))
+        "letproc f (x) -(x, 11) in (f (f 77))"))
 (value-of-program (
     scan&parse 
-        "let f = proc (x, y) +(x, y) in (f (4 3))"))
+        "let f = proc (x, y) +(x, y) in (f 4 3)"))
+
+; factorial: number -> number
+(value-of-program (
+    scan&parse 
+        "letproc f (x, z) 
+            if zero? (x) 
+                then
+                1
+                else
+                *(x, (z -(x, 1) z)) in 
+            let factorial = traceproc (n)
+                (f n f)
+            in (factorial 4)"))
