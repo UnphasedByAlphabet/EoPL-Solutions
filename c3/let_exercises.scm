@@ -25,11 +25,20 @@
         ("*" "(" expression "," expression ")")
         mul-exp)
     (expression 
-        ("//" "(" expression "," expression ")")
+        ("/" "(" expression "," expression ")")
         quot-exp)
     (expression
         ("zero?" "(" expression ")")
         zero?-exp)
+    (expression
+        ("equal?" "(" expression "," expression ")")
+            equal?-exp)
+    (expression
+        ("greater?" "(" expression "," expression ")")
+            greater?-exp)
+    (expression
+        ("less?" "(" expression "," expression ")")
+            less?-exp)
     (expression
         ("if" expression "then" expression "else" expression)
         if-exp)
@@ -39,12 +48,12 @@
         let-exp)
     (expression ; Extension minus of exercise 3.6
         ("minus" "(" expression ")")
-        minus-expression)))
-    (expression "emptylist" emptylist-exp)
-    (expression "cons" "(" expression "," expression ")" cons-list-exp)
-    (expression "null?" "(" expression ")" null?-exp)
-    (expression "car" expression car-exp)
-    (expression "cdr" expression cdr-exp)
+        minus-expression)
+    (expression ("emptylist") emptylist-exp)
+    (expression ("cons" "(" expression "," expression ")") cons-exp)
+    (expression ("null?" "(" expression ")") null?-exp)
+    (expression ("car" expression) car-exp)
+    (expression ("cdr" expression) cdr-exp)))
 
 
 (sllgen:make-define-datatypes the-lexical-spec the-grammar)
@@ -55,9 +64,9 @@
     (num-val
         (num number?))
     (bool-val
-        (bool boolean?))
+        (bool boolean?))     
     (emptylist-val)
-    (cons-val (first expval? rest expval?)))
+    (cons-val (first expval?) (rest expval?)))
 
 ; expval->num : ExpVal → Int
 (define expval->num
@@ -72,12 +81,6 @@
     (cases expval val
         (bool-val (bool) bool)
         (else (report-expval-extractor-error 'bool val)))))
-
-(define expval->emptylist
-    (lambda val
-        (cases expval val
-            (exptylist-val (elst) elst)
-            (else (report-expval-extractor-error 'exptylist val)))))
 
 ; https://github.com/svenpanne/EOPL3/blob/master/chapter3/exercise-3-09.rkt
 (define expval->emptylist?
@@ -173,6 +176,27 @@
                 (if (zero? num1)
                     (bool-val #t)
                     (bool-val #f)))))
+        (equal?-exp (exp1 exp2)
+            (let ((val1 (value-of exp1 env))
+                (val2 (value-of exp2 env)))
+                (let ((num1 (expval->num val1))
+                    (num2 (expval->num val2)))
+                    (bool-val
+                    (= num1 num2)))))
+        (greater?-exp (exp1 exp2)
+            (let ((val1 (value-of exp1 env))
+                (val2 (value-of exp2 env)))
+                (let ((num1 (expval->num val1))
+                    (num2 (expval->num val2)))
+                    (bool-val
+                    (> num1 num2)))))
+        (less?-exp (exp1 exp2)
+            (let ((val1 (value-of exp1 env))
+                (val2 (value-of exp2 env)))
+                (let ((num1 (expval->num val1))
+                    (num2 (expval->num val2)))
+                    (bool-val
+                    (< num1 num2)))))
         (if-exp (exp1 exp2 exp3)
             (let ((val1 (value-of exp1 env)))
             (if (expval->bool val1)
@@ -183,20 +207,21 @@
                 (value-of body (extend-env var val1 env))))
         (minus-expression (exp1)
             (let ((val1 (value-of exp1 env)))
-                (- (expval->num val1))))
+                (num-val 
+                    (- (expval->num val1)))))
         (emptylist-exp () (emptylist-val))
         (cons-exp (new list)
             (cons-val new list))
         (null?-exp (expr)
-            (let ((val value-of expr env))
-                (let ((bool1 expval->exptylist? val))
+            (let ((val (value-of expr env)))
+                (let ((bool1 (expval->emptylist? val)))
                     (bool-val bool1))))
         (car-exp (expr)
-            (let ((val value-of expr env))
-                (expval->car val))
+            (let ((val (value-of expr env)))
+                (expval->car val)))
         (cdr-exp (expr)
-            (let ((val value-of expr env))
-                (expval->cdr val)))))))
+            (let ((val (value-of expr env)))
+                (expval->cdr val))))))
 
 ;; init-env : -> Env
 ;; (init-env) builds an environment in which i is bound to the
@@ -213,4 +238,7 @@
                     (empty-env))))))
 
 
-(value-of-program (scan&parse "minus(v)"))
+(value-of-program (scan&parse "less? (v, minus(v))")) ; #f
+(value-of-program (scan&parse "greater? (v, minus(x))")) ; #t
+(value-of-program (scan&parse "greater? (v, x)")) ; #f
+(value-of-program (scan&parse "less? (v, x)")) ; #t

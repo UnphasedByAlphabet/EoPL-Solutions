@@ -25,7 +25,7 @@
         ("*" "(" expression "," expression ")")
         mul-exp)
     (expression 
-        ("//" "(" expression "," expression ")")
+        ("/" "(" expression "," expression ")")
         quot-exp)
     (expression
         ("zero?" "(" expression ")")
