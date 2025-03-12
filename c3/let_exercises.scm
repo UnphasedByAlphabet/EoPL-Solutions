@@ -54,7 +54,10 @@
     (expression ("null?" "(" expression ")") null?-exp)
     (expression ("car" expression) car-exp)
     (expression ("cdr" expression) cdr-exp)
-    (expression ("list" "(" (separated-list expression ",") ")") list-exp)))
+    (expression ("list" "(" (separated-list expression ",") ")") list-exp)
+    (expression ("switch" expression "{" 
+        (arbno "case" expression ":" expression "break")
+        "default" ":" expression "}") switch-exp)))
 
 
 (sllgen:make-define-datatypes the-lexical-spec the-grammar)
@@ -113,8 +116,12 @@
     (eopl:error (format "Invalid value (~s) provided for type '~s'" val type))))
 
 (define report-invalid-cdr-option
-(lambda (type val)
-    (eopl:error "Cannot get cdr value of list containing a single element" val type)))
+(lambda ()
+    (eopl:error "Cannot get cdr value of list containing a single element")))
+
+(define report-unsupported
+(lambda ()
+    (eopl:error "Unsupported Comparison")))
 
 (define run
 (lambda (string)
@@ -154,6 +161,25 @@
         (if (pair? lst)
             (cons-val (value-of (car lst) env) (value-of-list (cdr lst) env))
             (cons-val (value-of (car lst) env) '())))))
+
+(define value-of-switch-exp
+(lambda (eval-valueof value-exps action-exps default-exp env)
+    (if (null? value-exps)
+        (value-of default-exp env)
+        (let ((first-exp (car value-exps))
+            (rest-value-exps (cdr value-exps))
+            (first-action (car action-exps))
+            (rest-action-exps (cdr action-exps)))
+            (cases expval (value-of first-exp env)
+                (num-val (num)
+                    (if (eqv? eval-valueof num)
+                        (value-of first-action env)
+                        (value-of-switch-exp eval-valueof rest-value-exps rest-action-exps default-exp env)))
+                (bool-val (bool)
+                    (if (eqv? eval-valueof bool)
+                        (value-of first-action env)
+                        (value-of-switch-exp eval-valueof rest-value-exps rest-action-exps default-exp env)))
+                (else (value-of-switch-exp eval-valueof rest-value-exps rest-action-exps default-exp env)))))))
 
 (define value-of
 (lambda (exp env)
@@ -220,6 +246,13 @@
             (if (expval->bool val1)
                 (value-of exp2 env)
                 (value-of exp3 env))))
+        (switch-exp (exp1 exps2 exps3 exp4)
+            (cases expval (value-of exp1 env)
+                (num-val (num)
+                    (value-of-switch-exp num exps2 exps3 exp4 env))
+                (bool-val (bool)
+                    (value-of-switch-exp bool exps2 exps3 exp4 env))
+                (else report-unsupported)))
         (let-exp (var exp1 body)
             (let ((val1 (value-of exp1 env)))
                 (value-of body (extend-env var val1 env))))
@@ -263,3 +296,28 @@
 (value-of-program (scan&parse "greater? (v, x)")) ; #f
 (value-of-program (scan&parse "less? (v, x)")) ; #t
 (value-of-program (scan&parse "cdr list(v, x)")) ; value-of(x)
+(value-of-program (scan&parse 
+    "switch -(5, 3) {
+        case 6 : 9
+        break
+        case -(3, 9) : 20
+        break
+        case -(8, 6) : zero?(8)
+        break
+        case zero?(9) : 200
+        break 
+        default: 111
+    }")) ; (bool-val #f)
+(value-of-program (scan&parse 
+    "switch -(5, 3) {
+        case 6 : 9
+        break
+        case -(3, 9) : 20
+        break
+        case -(8, 11) : zero?(8)
+        break
+        case zero?(9) : 200
+        break 
+        default: 111
+    }")) ; 111
+
