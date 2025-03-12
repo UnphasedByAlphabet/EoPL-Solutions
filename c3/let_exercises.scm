@@ -53,7 +53,8 @@
     (expression ("cons" "(" expression "," expression ")") cons-exp)
     (expression ("null?" "(" expression ")") null?-exp)
     (expression ("car" expression) car-exp)
-    (expression ("cdr" expression) cdr-exp)))
+    (expression ("cdr" expression) cdr-exp)
+    (expression ("list" "(" (separated-list expression ",") ")") list-exp)))
 
 
 (sllgen:make-define-datatypes the-lexical-spec the-grammar)
@@ -66,7 +67,9 @@
     (bool-val
         (bool boolean?))     
     (emptylist-val)
-    (cons-val (first expval?) (rest expval?)))
+    (cons-val 
+        (first expval?) 
+        (rest expval?)))
 
 ; expval->num : ExpVal → Int
 (define expval->num
@@ -97,14 +100,21 @@
             (else (report-expval-extractor-error 'conslist val)))))
 
 (define expval->cdr
-    (lambda val
+    (lambda (val)
         (cases expval val
-            (cons-val (first rest) rest)
+            (cons-val (first rest) 
+                (cases expval rest
+                    (emptylist-val () report-invalid-cdr-option)
+                    (else rest)))
             (else (report-expval-extractor-error 'conslist val)))))
 
 (define report-expval-extractor-error
 (lambda (type val)
     (eopl:error (format "Invalid value (~s) provided for type '~s'" val type))))
+
+(define report-invalid-cdr-option
+(lambda (type val)
+    (eopl:error "Cannot get cdr value of list containing a single element" val type)))
 
 (define run
 (lambda (string)
@@ -136,6 +146,14 @@
 (define apply-env
     (lambda (env search-var)
         (env search-var)))
+
+(define value-of-list
+(lambda (lst env)
+    (if (null? lst)
+        (emptylist-val)
+        (if (pair? lst)
+            (cons-val (value-of (car lst) env) (value-of-list (cdr lst) env))
+            (cons-val (value-of (car lst) env) '())))))
 
 (define value-of
 (lambda (exp env)
@@ -221,7 +239,9 @@
                 (expval->car val)))
         (cdr-exp (expr)
             (let ((val (value-of expr env)))
-                (expval->cdr val))))))
+                (expval->cdr val)))
+        (list-exp (lst)
+            (value-of-list lst env)))))
 
 ;; init-env : -> Env
 ;; (init-env) builds an environment in which i is bound to the
@@ -242,3 +262,4 @@
 (value-of-program (scan&parse "greater? (v, minus(x))")) ; #t
 (value-of-program (scan&parse "greater? (v, x)")) ; #f
 (value-of-program (scan&parse "less? (v, x)")) ; #t
+(value-of-program (scan&parse "cdr list(v, x)")) ; value-of(x)
